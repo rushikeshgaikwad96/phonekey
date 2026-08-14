@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PhoneKey"
-include(":app")
+rootProject.name = 'PhoneKey'
+include ':app'

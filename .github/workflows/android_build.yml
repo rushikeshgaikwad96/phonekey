@@ -24,7 +24,7 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Generate Wrapper and Build Debug APK
+    - name: Generate Gradle Wrapper and Build APK
       working-directory: ./android
       run: |
         gradle wrapper --gradle-version 8.4
