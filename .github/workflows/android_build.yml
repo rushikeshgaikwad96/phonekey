@@ -21,23 +21,17 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
 
-    - name: Make Gradle wrapper executable
-      run: chmod +x android/gradlew || true
-
-    - name: Build Android Release APK
+    - name: Build Android APK (Debug & Release)
       working-directory: ./android
-      run: |
-        if [ -f gradlew ]; then
-          ./gradlew assembleRelease --no-daemon
-        else
-          gradle assembleRelease --no-daemon
-        fi
+      run: gradle assembleDebug assembleRelease --no-daemon
 
-    - name: Upload Release APK Artifact
+    - name: Upload APK Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: PhoneKey-Android-Release-APK
-        path: android/app/build/outputs/apk/release/*.apk
+        name: PhoneKey-Android-APKs
+        path: |
+          android/app/build/outputs/apk/debug/*.apk
+          android/app/build/outputs/apk/release/*.apk
