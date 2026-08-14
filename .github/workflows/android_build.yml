@@ -23,15 +23,25 @@ jobs:
 
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
+      id: setup-android
 
-    - name: Setup Gradle 8.4
+    - name: Create local.properties
+      working-directory: ./android
+      run: |
+        echo "sdk.dir=${{ steps.setup-android.outputs.sdk-path }}" > local.properties
+        cat local.properties
+
+    - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.4'
 
     - name: Build Android Debug APK
       working-directory: ./android
-      run: gradle assembleDebug --stacktrace --info
+      env:
+        ANDROID_HOME: ${{ steps.setup-android.outputs.sdk-path }}
+        ANDROID_SDK_ROOT: ${{ steps.setup-android.outputs.sdk-path }}
+      run: gradle assembleDebug --stacktrace
 
     - name: Upload Debug APK Artifact
       uses: actions/upload-artifact@v4
