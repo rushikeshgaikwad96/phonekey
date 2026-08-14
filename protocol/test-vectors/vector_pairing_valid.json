@@ -1,0 +1,10 @@
+{
+  "description": "PhoneKey Milestone 3 Out-of-Band Pairing Test Vector",
+  "session_id_hex": "aaaaaaaa000011112222bbbbbbbbbbbb",
+  "pc_ecdh_pub_hex": "04fbd78b798308514f6f691a098c6b3991225516fc592db251f98d172b060f17a152268531c1c2ae759e2a3d68f72b95e4252e577f9d1f7fc7aed7460312b691f9",
+  "phone_ecdh_pub_hex": "0452c1a6a12576090846c9f1aa8fe8d1837bd6f2fa352d6160dd10e53ff12dff20e1e4cbf3f7584cfc18ba195aa890686bf7511832e491f2133b6032f2a5bc07d5",
+  "shared_secret_hex": "a5c725f8d4026237f9fcb4a428178c253f712a351b77ec7d26057b5fa00939d7",
+  "k_enc_hex": "564652921872299b57b9a8ddef6d773f4de8219fa020083880665c005642b161",
+  "k_sas_hex": "ec93afdb4f965046c620fabf4ea5f8345093d18d8991738ce068967eeb0edb86",
+  "expected_sas_pin": "796512"
+}

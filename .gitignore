@@ -1,0 +1,43 @@
+# Visual Studio & MSVC Build Artifacts
+*.obj
+*.exe
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+bin/
+obj/
+x64/
+x86/
+
+# Android & Gradle Artifacts
+.gradle/
+build/
+*/build/
+*.apk
+*.aar
+*.keystore
+local.properties
+.idea/
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Scratch & Temporary Logs
+scratch/*.exe
+scratch/*.obj
+scratch/*.exp
+scratch/*.lib
+*.log
+
+# OS Generated
+.DS_Store
+Thumbs.db
+Desktop.ini
