@@ -39,7 +39,7 @@ bool TcpTransport::StartListener(uint16_t port) {
 
     sockaddr_in service;
     service.sin_family = AF_INET;
-    service.sin_addr.s_addr = INADDR_ANY;
+    service.sin_addr.s_addr = INADDR_ANY; // Binds to 0.0.0.0 (all network interfaces)
     service.sin_port = htons(port);
 
     if (bind(m_listenSocket, reinterpret_cast<SOCKADDR*>(&service), sizeof(service)) == SOCKET_ERROR) {
@@ -132,16 +132,38 @@ void TcpTransport::ReceiverWorker() {
 
         rxBuffer.insert(rxBuffer.end(), tempBuf, tempBuf + bytesRead);
 
-        // Process frames in rxBuffer
+        // Process frames in rxBuffer safely with payload cap & discard on corruption
         while (rxBuffer.size() >= 18) {
+            // Check magic bytes before attempting payload parse
+            uint32_t magic = (static_cast<uint32_t>(rxBuffer[0]) << 24) |
+                             (static_cast<uint32_t>(rxBuffer[1]) << 16) |
+                             (static_cast<uint32_t>(rxBuffer[2]) << 8)  |
+                              static_cast<uint32_t>(rxBuffer[3]);
+
+            if (magic != FRAME_MAGIC) {
+                if (m_listener) {
+                    m_listener->OnError("Stream corruption: invalid magic bytes. Discarding invalid stream byte.");
+                }
+                rxBuffer.erase(rxBuffer.begin()); // Drop invalid byte to resynchronize stream
+                continue;
+            }
+
             uint32_t payloadLen = (static_cast<uint32_t>(rxBuffer[4]) << 24) |
                                   (static_cast<uint32_t>(rxBuffer[5]) << 16) |
                                   (static_cast<uint32_t>(rxBuffer[6]) << 8)  |
                                    static_cast<uint32_t>(rxBuffer[7]);
 
-            size_t totalFrameLen = 14 + payloadLen + 4;
+            if (payloadLen > MAX_PAYLOAD_SIZE) {
+                if (m_listener) {
+                    m_listener->OnError("Stream security alert: frame payload size exceeds 64KB ceiling. Dropping connection.");
+                }
+                m_isConnected = false;
+                break;
+            }
+
+            size_t totalFrameLen = 14 + static_cast<size_t>(payloadLen) + 4;
             if (rxBuffer.size() < totalFrameLen) {
-                break; // Wait for rest of frame
+                break; // Wait for rest of frame bytes to arrive
             }
 
             TransportFrame frame;
@@ -172,6 +194,7 @@ bool TcpTransport::SendFrame(TransportMessageType messageType, const std::vector
     frame.payload = payload;
 
     std::vector<uint8_t> serialized = FrameProtocol::SerializeFrame(frame);
+    if (serialized.empty()) return false;
 
     int totalSent = 0;
     int toSend = static_cast<int>(serialized.size());

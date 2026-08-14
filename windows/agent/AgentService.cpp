@@ -89,7 +89,7 @@ ErrorCode AgentService::ProcessUnlockResponse(const TransportFrame& frame) {
         std::chrono::system_clock::now().time_since_epoch()
     ).count();
 
-    // 2. Validate Challenge Store state & 30s TTL
+    // 2. Validate Challenge Store state & 30s TTL without state mutation
     ChallengeRecord rec;
     ErrorCode valErr = m_challengeStore.ValidateChallenge(payloadP.sessionId, payloadP.deviceId, m_pcId, payloadP.challenge, nowMs, rec);
     if (valErr != ErrorCode::SUCCESS) {
@@ -108,8 +108,8 @@ ErrorCode AgentService::ProcessUnlockResponse(const TransportFrame& frame) {
         return ErrorCode::INVALID_SIGNATURE;
     }
 
-    // 5. Atomically consume challenge
-    ErrorCode consumeErr = m_challengeStore.ConsumeChallenge(payloadP.sessionId, payloadP.deviceId, m_pcId, payloadP.challenge, nowMs);
+    // 5. Atomically validate and consume challenge in single operation to prevent race condition
+    ErrorCode consumeErr = m_challengeStore.ValidateAndConsumeChallenge(payloadP.sessionId, payloadP.deviceId, m_pcId, payloadP.challenge, nowMs);
     return consumeErr;
 }
 

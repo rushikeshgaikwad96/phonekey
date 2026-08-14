@@ -2,11 +2,11 @@
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Android%2010%2B-brightgreen)
-![Security Audit](https://img.shields.io/badge/security%20audit-PASSED%20100%25-success)
+![Security Review](https://img.shields.io/badge/security-self--assessed-blue)
 ![Build](https://img.shields.io/badge/build-MSVC%20C%2B%2B20%20%7C%20Gradle-orange)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-blue)
 
-**PhoneKey** is a security-focused open-source project by [@rushikeshgaikwad96](https://github.com/rushikeshgaikwad96) that allows an Android smartphone's hardware-backed biometric authentication (fingerprint/face) to authorize unlocking a Windows PC over local encrypted transport channels (Wi-Fi Sockets / Bluetooth LE).
+**PhoneKey** is an open-source project by [@rushikeshgaikwad96](https://github.com/rushikeshgaikwad96) that allows an Android smartphone's hardware-backed biometric authentication (fingerprint/face) to authorize unlocking a Windows PC over local encrypted transport channels (Wi-Fi Sockets / Bluetooth LE).
 
 The phone acts as a cryptographic authentication token. The user's fingerprint or biometric data **NEVER** leaves the Android device.
 
@@ -45,59 +45,36 @@ The phone acts as a cryptographic authentication token. The user's fingerprint o
 
 ---
 
-## 🔒 Security Warranties Matrix
+## 🔒 Security Guarantees & Implementation Status
 
-| Security Guarantee | Technical Implementation | Status |
+| Security Guarantee | Technical Implementation & Code Location | Verification Status |
 | :--- | :--- | :--- |
-| **1. Zero Biometric Exposure** | Biometrics stay in Android TEE/StrongBox. `BiometricPrompt` returns only a cryptographic token. | **AUDITED & VERIFIED** |
-| **2. Non-Exportable Private Keys** | `KeyGenParameterSpec` non-exportable key tied to `AUTH_BIOMETRIC_STRONG`. Invalidated on new biometric enrollment. | **AUDITED & VERIFIED** |
-| **3. Zero Network Password Transmissions** | Plaintext credentials are **NEVER** transmitted over network/Bluetooth. Stored locally via Windows DPAPI (`CryptProtectData`). | **AUDITED & VERIFIED** |
-| **4. Replay & TTL Defense** | 256-bit CSPRNG nonces, 30s TTL, and atomic single-use state transitions (`OUTSTANDING` $\rightarrow$ `CONSUMED`). | **AUDITED & VERIFIED** |
-| **5. Out-of-Process Logon UI Isolation** | Credential Provider COM DLL in `logonui.exe` contains zero network code; communicates via Named Pipes (`\\.\pipe\PhoneKeyIPC`). | **AUDITED & VERIFIED** |
-| **6. Fail-Closed Guarantee** | Network failures or authentication timeouts leave native Windows Password/PIN tiles active. | **AUDITED & VERIFIED** |
+| **1. Zero Biometric Exposure** | `BiometricPrompt.CryptoObject` ([BiometricSigner.kt](file:///d:/projects/fingerprintapp/android/app/src/main/java/com/phonekey/crypto/BiometricSigner.kt#L33-L41)) | Implemented as designed (Author self-reviewed) |
+| **2. Non-Exportable Private Keys** | Keystore `KeyGenParameterSpec` ([KeyManager.kt](file:///d:/projects/fingerprintapp/android/app/src/main/java/com/phonekey/crypto/KeyManager.kt#L48-L68)) | Implemented as designed (Author self-reviewed) |
+| **3. Zero Network Password Transmissions** | Windows DPAPI + Local Named Pipe ([DpapiStorage.cpp](file:///d:/projects/fingerprintapp/windows/agent/DpapiStorage.cpp#L18)) | Implemented as designed (Author self-reviewed) |
+| **4. Replay & TTL Defense** | 256-bit CSPRNG nonces + 30s TTL ([ChallengeStore.cpp](file:///d:/projects/fingerprintapp/windows/agent/ChallengeStore.cpp#L64)) | Implemented as designed (Author self-reviewed) |
+| **5. Out-of-Process Logon UI Isolation** | COM DLL IPC over Local Pipe ([PhoneKeyCredentialProvider.cpp](file:///d:/projects/fingerprintapp/windows/credential-provider/PhoneKeyCredentialProvider.cpp)) | Implemented as designed (Author self-reviewed) |
+| **6. Fail-Closed Guarantee** | `CPGSR_NO_CREDENTIAL_FINISHED` ([PhoneKeyCredential.cpp](file:///d:/projects/fingerprintapp/windows/credential-provider/PhoneKeyCredential.cpp#L80)) | Implemented as designed (Author self-reviewed) |
+
+> [!NOTE]
+> Detailed self-assessment breakdown, threat model details, and known architectural limitations are documented in [docs/security_self_assessment.md](docs/security_self_assessment.md) and [docs/known_limitations.md](docs/known_limitations.md).
 
 ---
 
-## 🛠️ Feature & Milestone Matrix
+## 🛠️ Automated Test Suite Breakdown
 
-- **Milestone 1**: Project Architecture ([docs/architecture.md](docs/architecture.md)), Threat Model ([docs/threat-model.md](docs/threat-model.md)), and Protocol Specs ([protocol/protocol_spec.md](protocol/protocol_spec.md)).
-- **Milestone 2**: Android Keystore ECDSA P-256 keys, `BiometricPrompt` gating, canonical 108B payload serializer, CNG `BCryptVerifySignature` verifier, and 30s TTL challenge store.
-- **Milestone 3**: Out-of-band secure pairing via Ephemeral ECDH P-256, HKDF-SHA256, SAS 6-digit PIN visual matching, and Windows DPAPI encrypted storage.
-- **Milestone 4**: Abstract transport layer (`ITransport`), binary framing protocol (`PKFR` magic bytes, sequence counter, CRC32 checksum), WinSock2 TCP socket server/client, and Bluetooth BLE abstraction.
-- **Milestone 5**: Out-of-process Windows Agent Service host (`PhoneKeyAgent.exe`), Android unlock engine (`UnlockController.kt`), and socket-based challenge-response authentication.
-- **Milestone 6**: Windows Credential Provider COM DLL (`PhoneKeyCredentialProvider.dll`) implementing `ICredentialProvider` and `ICredentialProviderCredential2`, communicating over protected local Named Pipes (`\\.\pipe\PhoneKeyIPC`).
-- **Milestone 7**: Security Audit Report ([docs/security_audit.md](docs/security_audit.md)), User Setup Guide ([docs/user_setup_guide.md](docs/user_setup_guide.md)), Release Build Script (`scratch/build_all_release.bat`), and Master Test Runner (`test_master_runner.exe`).
-- **Phase 2**: Multi-Device Registry (`MultiDeviceManager.h/cpp`), FIDO2 / CTAP2 Security Key Protocol Bridge (`Ctap2Bridge.h/cpp`, [docs/fido2_ctap2_spec.md](docs/fido2_ctap2_spec.md)), and Inno Setup Installer (`installer/PhoneKeyInstaller.iss`).
+PhoneKey includes automated test suites covering core cryptographic functions, framing, transport, E2E unlock flows, and Phase 2 enhancements:
+
+| Test Runner Executable | Subsystems Tested | Unit Tests | Verification Coverage Bounds |
+| :--- | :--- | :--- | :--- |
+| **`test_master_runner.exe`** | Crypto, Pairing, Framing, E2E, IPC | 26 Tests | **Covered**: CNG Signature Verification, CSPRNG Nonce TTL, ECDH Key Exchange, HKDF-SHA256, SAS PIN Truncation, Frame CRC32 Checksum, Named Pipe IPC.<br>**Not Covered**: Android UI Compose rendering, physical Bluetooth LE radio hardware, OS-level `logonui.exe` COM loader. |
+| **`test_phase2_suite.exe`** | Multi-Device & CTAP2 Bridge | 12 Tests | **Covered**: Multi-device registration/revocation, DPAPI encrypted device registry, CTAP2 37-byte `authenticatorData` formatting.<br>**Not Covered**: Browser WebAuthn API drivers. |
 
 ---
 
-## 🚀 Building & Running
-
-### Windows Release Binaries (Visual Studio 2022 MSVC)
-Run the automated release build script:
-```cmd
-scratch\build_all_release.bat
-```
-This compiles:
-- `PhoneKeyAgent.exe` (Windows Agent Desktop Service)
-- `PhoneKeyCredentialProvider.dll` (Windows Credential Provider COM DLL)
-- `test_master_runner.exe` (Unified Master Test Suite — **100% PASS RATE**)
-
-### Android Release APK (Automatic Cloud Build)
-This repository includes a GitHub Actions CI/CD workflow ([.github/workflows/android_build.yml](.github/workflows/android_build.yml)).
-Pushing to GitHub automatically compiles the Android APK and makes it available under the repository's **Actions** tab for direct download.
-
----
-
-## 📤 Quick Push to GitHub
-
-```cmd
-git remote add origin https://github.com/rushikeshgaikwad96/phonekey.git
-git branch -M main
-git push -u origin main
-```
-
----
-
-## 📄 License
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+## 📄 License & Documentation
+- **Security Self-Assessment**: [docs/security_self_assessment.md](docs/security_self_assessment.md)
+- **Threat Model**: [docs/threat-model.md](docs/threat-model.md)
+- **Known Limitations**: [docs/known_limitations.md](docs/known_limitations.md)
+- **Setup Guide**: [docs/user_setup_guide.md](docs/user_setup_guide.md)
+- **License**: Apache License 2.0 ([LICENSE](LICENSE))

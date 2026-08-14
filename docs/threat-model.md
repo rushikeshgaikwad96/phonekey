@@ -1,36 +1,43 @@
 # PhoneKey Threat Model & Risk Mitigation Matrix
 
 ## 1. Overview
-PhoneKey assumes a **hostile network environment**. Wi-Fi networks (including home and corporate Wi-Fi) are assumed to be susceptible to packet sniffing, ARP spoofing, rogue access points, and active Man-in-the-Middle (MITM) attacks.
+PhoneKey assumes a **hostile local network environment**. Wi-Fi networks (home, public, and corporate) are assumed to be susceptible to packet sniffing, ARP spoofing, rogue access points, and active network tampering.
 
 ---
 
-## 2. Threat Analysis Matrix (Milestone 2 Protections)
+## 2. Threat Analysis & Defense Matrix
 
-| Threat | Attack Vector | Severity | Milestone 2 Defense Mechanism | Status |
+| Threat Category | Specific Threat | Severity | Defense Mechanism & Implementation | Reality & Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Biometric Exfiltration** | Attacker attempts to intercept or extract user fingerprint data over network or IPC. | Critical | **Architectural Impossibility**: Biometric image/template never leaves Android TEE/StrongBox. Android `BiometricPrompt` returns only success/fail boolean to app code. | **Protected in M2** |
-| **Replay Attack** | Attacker intercepts a valid signed unlock response and retransmits it to unlock the PC later. | High | **Single-use Ephemeral Challenges**: Each unlock request generates a 256-bit CSPRNG challenge with a strictly enforced 30-second TTL. The Windows verifier maintains single-use state (`OUTSTANDING`, `CONSUMED`, `EXPIRED`). | **Protected in M2** |
-| **Private Key Exfiltration** | Attacker attempts to read private key from Android storage. | Critical | **Hardware Keystore Isolation**: Key created via `KeyGenParameterSpec` with non-exportable flag in Android TEE/StrongBox. | **Protected in M2** |
-| **Unauthorized Signing** | Attacker uses unlocked phone to produce signature without biometric auth. | High | **Per-operation Biometric Gate**: Android private key requires `BIOMETRIC_STRONG` with validity 0s. Every signature requires explicit biometric scan. | **Protected in M2** |
-| **Payload Tampering** | Attacker modifies challenge, timestamp, or target PC ID in transit. | High | **Cryptographic Binding**: ECDSA signature covers canonical 108-byte payload prefixed with `PhoneKey-Auth-v1`. Any modification invalidates signature. | **Protected in M2** |
-| **Expired Challenge Reuse** | Attacker sends signature after 30-second window. | Medium | **Authoritative Host TTL**: Windows enforces 30s TTL check locally. | **Protected in M2** |
-| **Rogue Device Signature** | Unpaired device attempts to send signature. | High | **Dev Device Registry**: Windows verifies signatures using locally registered public keys only. Network-supplied public keys are rejected. | **Protected in M2** |
+| **Data Corruption** | Accidental Network Packet Corruption | Low | **IEEE 802.3 CRC32 Checksum**: `FrameProtocol::CalculateCrc32` verifies frame integrity before parsing payload bytes. | **Mitigates accidental noise/corruption only.** *Not a security control.* |
+| **Network Forgery** | Active Packet Tampering / Signature Forgery | Critical | **ECDSA P-256 Signature Verification**: CNG `BCryptVerifySignature` checks 64-byte signature over canonical 108B payload $P$. Network attacker cannot forge valid signatures without private key. | **Implemented as designed.** Cryptographic tamper resistance. |
+| **Replay Attacks** | Intercepted Response Retransmission | High | **CSPRNG Nonces & 30s Host TTL**: 256-bit nonces generated via CNG `BCryptGenRandom`. Host `ChallengeStore` enforces 30s TTL and single-use state transition (`OUTSTANDING` $\rightarrow$ `CONSUMED`). | **Implemented as designed.** Prevents challenge reuse. |
+| **Key Exfiltration** | Android Private Key Extraction | Critical | **Hardware Keystore Isolation**: Key generated in Android TEE/StrongBox with `setUserAuthenticationRequired(true)` and `setInvalidatedByBiometricEnrollment(true)`. Private key is non-exportable. | **Implemented as designed.** Hardware isolated. |
+| **Biometric Theft** | Raw Biometric Data Interception | Critical | **Architectural Isolation**: Biometric images/templates stay in Android TEE. `BiometricPrompt.CryptoObject` returns only a signature token. | **Implemented as designed.** Zero biometric exposure. |
+| **Password Theft** | Windows Logon Credential Interception | Critical | **DPAPI Encryption & Local Pipe IPC**: Plaintext credentials stored locally via Windows DPAPI (`CryptProtectData`) and sent strictly via local Named Pipe (`\\.\pipe\PhoneKeyIPC`). | **Implemented as designed.** Zero network password transmission. |
 
 ---
 
-## 3. Out-of-Scope Threat Matrix (Future Milestones)
+## 3. Additional Threat Scenarios & Mitigations
 
-| Threat | Future Milestone Target | Description & Planned Defense |
-| :--- | :--- | :--- |
-| **Active Transport MITM** | Milestone 4 | Protected via AES-256-GCM / Noise Protocol transport encryption. |
-| **Pairing Interception** | Milestone 3 | Protected via QR scanning, Ephemeral ECDH, and 6-digit SAS PIN matching. |
-| **Credential Provider Exploits**| Milestone 6 | Protected via out-of-process Named Pipe IPC isolation and Windows LSA credential security. |
+### Scenario A: Unlocked Phone Stolen Mid-Session
+- **Risk**: An attacker steals an unlocked Android phone while the owner is nearby.
+- **Mitigation**: `BiometricSigner.kt` enforces `setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG)`. Every single unlock signature requires a fresh biometric scan (fingerprint/face) at the exact moment of signing. Being unlocked on home screen does **not** grant authorization to sign.
+
+### Scenario B: Lost or Stolen Paired Smartphone
+- **Risk**: A paired smartphone is lost or stolen permanently.
+- **Mitigation**: Windows `MultiDeviceManager` provides device revocation (`RevokeDevice(deviceId)`). Revoking a device removes its public key from DPAPI storage, immediately invalidating all future authentication attempts from that smartphone.
+
+### Scenario C: Rate Limiting & Lockout Behavior
+- **Risk**: Automated network attacker attempts brute-force signature or challenge guesses over port 8443.
+- **Mitigation**: `ChallengeStore` limits active challenges and enforces 30-second TTL expiration. Invalid signature responses trigger error code `0x0002`. Standard Windows account lockout policies apply at the OS level on repeated failed logon attempts.
+
+### Scenario D: Multi-Device Compromise Isolation
+- **Risk**: User has paired two smartphones (Primary & Backup), and one phone is compromised.
+- **Mitigation**: Each paired smartphone generates an independent ECDSA P-256 keypair. Revoking or compromising Device A has zero cryptographic impact on Device B.
 
 ---
 
-## 4. Mandatory Security Rules
-1. **Zero Biometric Exposure**: Biometric data never leaves Android device hardware.
-2. **Hardware Key Enclosure**: Private keys never leave hardware TEE/StrongBox.
-3. **Fail-Closed Security**: Any verification exception, expired challenge, or signature mismatch fails safely.
-4. **Windows Authoritative Control**: Windows strictly decides challenge freshness, single-use state, and signature validity.
+## 4. Network Exposure & Firewall Guidance
+- **TcpTransport Bind Scope**: Listens on `0.0.0.0` (all interfaces) port 8443.
+- **Recommendation**: Restrict incoming traffic on port 8443 via Windows Defender Firewall to trusted local IP subnets (`192.168.x.x` / `10.x.x.x`), or use Bluetooth LE.

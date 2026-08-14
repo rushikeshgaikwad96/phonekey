@@ -32,6 +32,13 @@ public:
                                const std::array<uint8_t, CHALLENGE_SIZE>& challenge,
                                uint64_t currentTimeMs);
 
+    // Atomically validates AND consumes challenge in a single thread-safe operation
+    ErrorCode ValidateAndConsumeChallenge(const std::array<uint8_t, UUID_SIZE>& sessionId,
+                                          const std::array<uint8_t, UUID_SIZE>& deviceId,
+                                          const std::array<uint8_t, UUID_SIZE>& pcId,
+                                          const std::array<uint8_t, CHALLENGE_SIZE>& challenge,
+                                          uint64_t currentTimeMs);
+
     // Purges expired challenges from store
     size_t ExpireChallenges(uint64_t currentTimeMs);
 
