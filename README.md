@@ -6,7 +6,7 @@
 ![Build](https://img.shields.io/badge/build-MSVC%20C%2B%2B20%20%7C%20Gradle-orange)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-blue)
 
-**PhoneKey** is a security-focused open-source project that allows an Android smartphone's hardware-backed biometric authentication (fingerprint/face) to authorize unlocking a Windows PC over local encrypted transport channels (Wi-Fi Sockets / Bluetooth LE).
+**PhoneKey** is a security-focused open-source project by [@rushikeshgaikwad96](https://github.com/rushikeshgaikwad96) that allows an Android smartphone's hardware-backed biometric authentication (fingerprint/face) to authorize unlocking a Windows PC over local encrypted transport channels (Wi-Fi Sockets / Bluetooth LE).
 
 The phone acts as a cryptographic authentication token. The user's fingerprint or biometric data **NEVER** leaves the Android device.
 
@@ -86,6 +86,16 @@ This compiles:
 ### Android Release APK (Automatic Cloud Build)
 This repository includes a GitHub Actions CI/CD workflow ([.github/workflows/android_build.yml](.github/workflows/android_build.yml)).
 Pushing to GitHub automatically compiles the Android APK and makes it available under the repository's **Actions** tab for direct download.
+
+---
+
+## 📤 Quick Push to GitHub
+
+```cmd
+git remote add origin https://github.com/rushikeshgaikwad96/phonekey.git
+git branch -M main
+git push -u origin main
+```
 
 ---
 
